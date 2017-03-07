@@ -8,20 +8,26 @@ import java.security.KeyStore;
 import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
 import java.security.cert.CertificateException;
+import java.util.Map;
 
 import org.eclipse.kura.KuraConnectException;
+import org.eclipse.kura.KuraErrorCode;
 import org.eclipse.kura.KuraException;
 import org.eclipse.kura.KuraNotConnectedException;
 import org.eclipse.kura.KuraTimeoutException;
 import org.eclipse.kura.KuraTooManyInflightMessagesException;
 import org.eclipse.kura.configuration.ConfigurableComponent;
+import org.eclipse.kura.configuration.ConfigurationService;
+import org.eclipse.kura.core.util.ValidationUtil;
 import org.eclipse.kura.data.DataTransportService;
 import org.eclipse.kura.data.DataTransportToken;
 import org.eclipse.kura.data.transport.listener.DataTransportListener;
 import org.eclipse.kura.ssl.SslManagerService;
+import org.eclipse.kura.ssl.SslServiceListener;
 import org.eclipse.kura.status.CloudConnectionStatusComponent;
 import org.eclipse.kura.status.CloudConnectionStatusEnum;
 import org.eclipse.kura.status.CloudConnectionStatusService;
+import org.osgi.service.component.ComponentContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -32,25 +38,42 @@ import com.amazonaws.services.iot.client.AWSIotMqttClient;
 import com.amazonaws.services.iot.client.AWSIotQos;
 import com.amazonaws.services.iot.client.AWSIotTimeoutException;
 
-public class AwsIotMqttDataTransport implements DataTransportService, ConfigurableComponent, CloudConnectionStatusComponent {
+public class AwsIotMqttDataTransport implements DataTransportService, ConfigurableComponent, CloudConnectionStatusComponent,SslServiceListener {
 
 	private static final Logger logger = LoggerFactory.getLogger(AwsIotMqttDataTransport.class);
 	
+	private static final String MQTT_BROKER_URL_PROP_NAME = "broker.url";
+	private static final String MQTT_CLIENT_ID_PROP_NAME = "client.id";
+	private static final String MQTT_BASE_RETRY_DELAY_PROP_NAME = "base.retry.delay";
+	private static final String MQTT_CONNECTION_TIMEOUT_PROP_NAME = "connection.timeout";
+	private static final String MQTT_KEEP_ALIVE_INTERVAL_PROP_NAME = "keep.alive.interval";
+	private static final String MQTT_MAX_CONNECTION_RETRIES_PROP_NAME = "max.connection.retries";
+	private static final String MQTT_MAX_OFFLINE_QUEUE_SIZE_PROP_NAME = "max.offline.queue.size";
+	private static final String MQTT_MAX_RETRY_DELAY_PROP_NAME = "max.retry.delay";
+	private static final String MQTT_NUM_OF_CLIENT_THREADS_PROP_NAME = "num.of.client.threads";
+	private static final String MQTT_SERVER_ACK_TIMEOUT_PROP_NAME = "server.ack.timeout";
+	private static final String MQTT_WILL_MESSAGE_TOPIC_PROP_NAME = "will.message.topic";
+	private static final String MQTT_WILL_MESSAGE_PAYLOAD_PROP_NAME = "will.message.payload";
+	private static final String MQTT_WILL_MESSAGE_QOS_PROP_NAME = "will.message.qos";
+	
 	private SslManagerService sslManagerService;
 	private CloudConnectionStatusService cloudConnectionStatusService;
+	private CloudConnectionStatusEnum notificationStatus = CloudConnectionStatusEnum.OFF;
 	
 	private AWSIotMqttClient mqttClient;
 	
+	private Map<String, Object> properties;
+	
 	private String brokerUrl;
 	private String clientId;
-	private int baseRetryDelay;
-	private int connectionTimeout;
-	private int keepAliveInterval;
-	private int maxConnectionRetries;
-	private int maxOfflineQueueSize;
-	private int maxRetryDelay;
-	private int numOfClientThreads;
-	private int serverAckTimeout;
+	private Integer baseRetryDelay;
+	private Integer connectionTimeout;
+	private Integer keepAliveInterval;
+	private Integer maxConnectionRetries;
+	private Integer maxOfflineQueueSize;
+	private Integer maxRetryDelay;
+	private Integer numOfClientThreads;
+	private Integer serverAckTimeout;
 	private String willMessageTopic;
 	private String willMessagePayload;
 	private String willMessageQos;
@@ -71,6 +94,30 @@ public class AwsIotMqttDataTransport implements DataTransportService, Configurab
         this.cloudConnectionStatusService = null;
     }
 	
+    protected void activate(ComponentContext componentContext, Map<String, Object> properties) {
+    	logger.info("Activating {}...", properties.get(ConfigurationService.KURA_SERVICE_PID));
+    	this.properties.putAll(properties);
+    	try {
+    		logger.info("Building new configuration...");
+            buildConfiguration(properties);
+        } catch (RuntimeException e) {
+            logger.error("Invalid client configuration. Service will not be able to connect until the configuration is updated", e);
+        }
+    }
+    
+    protected void deactivate(ComponentContext componentContext) {
+        logger.debug("Deactivating {}...", this.properties.get(ConfigurationService.KURA_SERVICE_PID));
+        if (isConnected()) {
+            disconnect(0);
+        }
+    }
+    
+    public void updated(Map<String, Object> properties) {
+        logger.info("Updating {}...", properties.get(ConfigurationService.KURA_SERVICE_PID));
+        this.properties.putAll(properties);
+        update();
+    }
+    
 	@Override
 	public synchronized void connect() throws KuraConnectException {
 		// ToDo: Notify listeners
@@ -201,8 +248,43 @@ public class AwsIotMqttDataTransport implements DataTransportService, Configurab
 
 	@Override
 	public void setNotificationStatus(CloudConnectionStatusEnum status) {
-		// TODO Auto-generated method stub
-		
+		this.notificationStatus = status;
+	}
+	
+	@Override
+	public void onConfigurationUpdated() {
+		update();
+	}
+	
+	private void buildConfiguration(Map<String, Object> properties) {
+		try {
+			this.brokerUrl = (String) properties.get(MQTT_BROKER_URL_PROP_NAME);
+			ValidationUtil.notEmptyOrNull(this.brokerUrl, MQTT_BROKER_URL_PROP_NAME);
+			this.clientId = (String) properties.get(MQTT_CLIENT_ID_PROP_NAME);
+			ValidationUtil.notEmptyOrNull(this.clientId, MQTT_CLIENT_ID_PROP_NAME);
+			this.baseRetryDelay = (Integer) properties.get(MQTT_BASE_RETRY_DELAY_PROP_NAME);
+			this.connectionTimeout = (Integer) properties.get(MQTT_CONNECTION_TIMEOUT_PROP_NAME);
+			this.keepAliveInterval = (Integer) properties.get(MQTT_KEEP_ALIVE_INTERVAL_PROP_NAME);
+			this.maxConnectionRetries = (Integer) properties.get(MQTT_MAX_CONNECTION_RETRIES_PROP_NAME);
+			this.maxOfflineQueueSize = (Integer) properties.get(MQTT_MAX_OFFLINE_QUEUE_SIZE_PROP_NAME);
+			this.maxRetryDelay = (Integer) properties.get(MQTT_MAX_RETRY_DELAY_PROP_NAME);
+			this.numOfClientThreads = (Integer) properties.get(MQTT_NUM_OF_CLIENT_THREADS_PROP_NAME);
+			this.serverAckTimeout = (Integer) properties.get(MQTT_SERVER_ACK_TIMEOUT_PROP_NAME);
+			this.willMessageTopic = (String) properties.get(MQTT_WILL_MESSAGE_TOPIC_PROP_NAME);
+			this.willMessagePayload = (String) properties.get(MQTT_WILL_MESSAGE_PAYLOAD_PROP_NAME);
+			this.willMessageQos = (String) properties.get(MQTT_WILL_MESSAGE_QOS_PROP_NAME);
+			if (!this.willMessageTopic.isEmpty()) {
+				ValidationUtil.notEmptyOrNull(this.willMessageQos, MQTT_WILL_MESSAGE_QOS_PROP_NAME);
+				try {
+					AWSIotQos.valueOf(this.willMessageQos);
+				} catch (IllegalArgumentException e) {
+					throw new KuraException(KuraErrorCode.CONFIGURATION_ATTRIBUTE_INVALID, MQTT_WILL_MESSAGE_QOS_PROP_NAME);
+				}
+			}
+		} catch (KuraException e) {
+			logger.error("Invalid configuration");
+            throw new IllegalStateException("Invalid MQTT client configuration", e);
+		}
 	}
 	
 	private void setupMqttSession() throws KuraConnectException {
@@ -230,7 +312,9 @@ public class AwsIotMqttDataTransport implements DataTransportService, Configurab
 			this.mqttClient.setMaxRetryDelay(this.maxRetryDelay);
 			this.mqttClient.setNumOfClientThreads(this.numOfClientThreads);
 			this.mqttClient.setServerAckTimeout(this.serverAckTimeout);
-			this.mqttClient.setWillMessage(new AWSIotMessage(this.willMessageTopic, AWSIotQos.valueOf(this.willMessageQos), this.willMessagePayload));
+			if (!this.willMessageTopic.isEmpty()) {
+				this.mqttClient.setWillMessage(new AWSIotMessage(this.willMessageTopic, AWSIotQos.valueOf(this.willMessageQos), this.willMessagePayload));
+			}
 		}
 	}
 	
@@ -303,4 +387,13 @@ public class AwsIotMqttDataTransport implements DataTransportService, Configurab
 		} catch (Exception e) {}
 		this.mqttClient = null;
 	}
+	
+	private void update() {
+    	try {
+    		logger.info("Building new configuration...");
+            buildConfiguration(properties);
+        } catch (RuntimeException e) {
+            logger.error("Invalid client configuration. Service will not be able to connect until the configuration is updated", e);
+        }
+    }
 }
