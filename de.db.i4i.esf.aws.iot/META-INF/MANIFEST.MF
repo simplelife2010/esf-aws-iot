@@ -1,0 +1,7 @@
+Manifest-Version: 1.0
+Bundle-ManifestVersion: 2
+Bundle-Name: de.db.i4i.esf.aws.iot
+Bundle-SymbolicName: de.db.i4i.esf.aws.iot
+Bundle-Version: 0.0.1.qualifier
+Bundle-Vendor: DB Systel GmbH
+Bundle-RequiredExecutionEnvironment: JavaSE-1.6
