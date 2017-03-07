@@ -73,6 +73,7 @@ public class AwsIotMqttDataTransport implements DataTransportService, Configurab
 	
 	@Override
 	public synchronized void connect() throws KuraConnectException {
+		// ToDo: Notify listeners
 		if (isConnected()) {
             logger.error("Already connected");
             throw new IllegalStateException("Already connected");
@@ -120,12 +121,12 @@ public class AwsIotMqttDataTransport implements DataTransportService, Configurab
 
 	@Override
 	public String getAccountName() {
-		return null;
+		return "";
 	}
 
 	@Override
 	public String getUsername() {
-		return null;
+		return "";
 	}
 
 	@Override
@@ -134,9 +135,25 @@ public class AwsIotMqttDataTransport implements DataTransportService, Configurab
 	}
 
 	@Override
-	public void disconnect(long quiesceTimeout) {
-		// TODO Auto-generated method stub
-
+	public synchronized void disconnect(long quiesceTimeout) {
+		// ToDo: Notify listeners
+		if (isConnected()) {
+            logger.info("Disconnecting...");
+            AWSIotMqttClient disconnectingMqttClient = this.mqttClient;
+            this.mqttClient = null;
+            if (quiesceTimeout > 0) {
+				try {
+					Thread.sleep(quiesceTimeout);
+				} catch (InterruptedException e) {
+					logger.warn("Sleep interrupted");
+				}
+            }
+            try {
+				disconnectingMqttClient.disconnect(0, false);
+			} catch (Exception e) {}
+		} else {
+            logger.warn("MQTT client already disconnected");
+		}
 	}
 
 	@Override
@@ -283,7 +300,7 @@ public class AwsIotMqttDataTransport implements DataTransportService, Configurab
 		logger.info("Closing client");
 		try {
 			this.mqttClient.disconnect(0, false);
-		} catch (AWSIotException e) {} catch (AWSIotTimeoutException e) {}
+		} catch (Exception e) {}
 		this.mqttClient = null;
 	}
 }
