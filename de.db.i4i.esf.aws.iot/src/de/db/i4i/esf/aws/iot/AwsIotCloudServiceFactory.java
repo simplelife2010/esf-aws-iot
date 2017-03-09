@@ -13,8 +13,12 @@ import org.eclipse.kura.cloud.factory.CloudServiceFactory;
 import org.eclipse.kura.configuration.ComponentConfiguration;
 import org.eclipse.kura.configuration.ConfigurationService;
 import org.osgi.service.component.ComponentConstants;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class AwsIotCloudServiceFactory implements CloudServiceFactory {
+	
+	private static final Logger logger = LoggerFactory.getLogger(AwsIotCloudServiceFactory.class);
 	
 	private static final String FACTORY_PID = "de.db.i4i.esf.aws.iot.AwsIotCloudServiceFactory";
     private static final String CLOUD_SERVICE_FACTORY_PID = "de.db.i4i.esf.aws.iot.AwsIotCloudService";
@@ -44,11 +48,13 @@ public class AwsIotCloudServiceFactory implements CloudServiceFactory {
 	
 	@Override
 	public String getFactoryPid() {
+		logger.info("getFactoryPid() returns {}", CLOUD_SERVICE_FACTORY_PID);
         return CLOUD_SERVICE_FACTORY_PID;
     }
 
 	@Override
 	public void createConfiguration(String pid) throws KuraException {
+		logger.info("createConfiguration({})", pid);
         String[] parts = pid.split("-");
         if (parts.length != 0 && CLOUD_SERVICE_PID.equals(parts[0])) {
             String suffix = null;
@@ -108,6 +114,10 @@ public class AwsIotCloudServiceFactory implements CloudServiceFactory {
             componentPids.add(pid);
             componentPids.add(dataServicePid);
             componentPids.add(dataTransportServicePid);
+            logger.info("getStackComponentPids({}) returns ...", pid);
+            for (String resultPid : componentPids) {
+            	logger.info("... {}", resultPid);
+            }
             return componentPids;
         } else {
             throw new KuraException(KuraErrorCode.INVALID_PARAMETER, "Invalid PID '{}'", pid);
@@ -116,6 +126,7 @@ public class AwsIotCloudServiceFactory implements CloudServiceFactory {
 
 	@Override
 	public void deleteConfiguration(String pid) throws KuraException {
+		logger.info("deleteConfiguration({})", pid);
         String[] parts = pid.split("-");
         if (parts.length != 0 && CLOUD_SERVICE_PID.equals(parts[0])) {
             String suffix = null;
@@ -146,6 +157,10 @@ public class AwsIotCloudServiceFactory implements CloudServiceFactory {
             }
         }
 
+        logger.info("getManagedCloudServicePids() returns...");
+        for (String resultPid : result) {
+        	logger.info("... {}", resultPid);
+        }
         return result;
     }
 }
