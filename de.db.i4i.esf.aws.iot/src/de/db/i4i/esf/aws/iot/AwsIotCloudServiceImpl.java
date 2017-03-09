@@ -2,6 +2,7 @@ package de.db.i4i.esf.aws.iot;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 import org.eclipse.kura.KuraErrorCode;
@@ -9,12 +10,18 @@ import org.eclipse.kura.KuraException;
 import org.eclipse.kura.cloud.CloudClient;
 import org.eclipse.kura.cloud.CloudService;
 import org.eclipse.kura.configuration.ConfigurableComponent;
+import org.eclipse.kura.configuration.ConfigurationService;
 import org.eclipse.kura.data.DataService;
 import org.eclipse.kura.data.listener.DataServiceListener;
 import org.eclipse.kura.message.KuraPayload;
+import org.osgi.service.component.ComponentContext;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class AwsIotCloudServiceImpl implements CloudService, DataServiceListener, ConfigurableComponent,
 		CloudPayloadJsonEncoder, CloudPayloadJsonDecoder {
+	
+	private static final Logger logger = LoggerFactory.getLogger(AwsIotCloudServiceImpl.class);
 	
 	private AwsIotCloudServiceOptions options;
 	
@@ -26,6 +33,30 @@ public class AwsIotCloudServiceImpl implements CloudService, DataServiceListener
         this.cloudClients = new CopyOnWriteArrayList<AwsIotCloudClientImpl>();
     }
 
+	public void setDataService(DataService dataService) {
+        this.dataService = dataService;
+    }
+
+    public void unsetDataService(DataService dataService) {
+        this.dataService = null;
+    }
+	
+	protected void activate(ComponentContext componentContext, Map<String, Object> properties) {
+        logger.info("activate {}...", properties.get(ConfigurationService.KURA_SERVICE_PID));
+        
+        this.options = new AwsIotCloudServiceOptions();
+	}
+	
+	public void updated(Map<String, Object> properties) {
+		logger.info("updated {}...: {}", properties.get(ConfigurationService.KURA_SERVICE_PID), properties);
+		
+		this.options = new AwsIotCloudServiceOptions();
+	}
+	
+	protected void deactivate(ComponentContext componentContext) {
+		logger.info("deactivate {}...", componentContext.getProperties().get(ConfigurationService.KURA_SERVICE_PID));
+	}
+	
 	@Override
 	public KuraPayload buildFromByteArray(byte[] payload) throws KuraException {
 		// TODO Auto-generated method stub
