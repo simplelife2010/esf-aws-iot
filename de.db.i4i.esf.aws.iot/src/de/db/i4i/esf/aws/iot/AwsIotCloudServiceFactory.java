@@ -74,6 +74,8 @@ public class AwsIotCloudServiceFactory implements CloudServiceFactory {
             String name = DATA_SERVICE_REFERENCE_NAME + ComponentConstants.REFERENCE_TARGET_SUFFIX;
             cloudServiceProperties.put(name, String.format(REFERENCE_TARGET_VALUE_FORMAT, dataServicePid));
             cloudServiceProperties.put(KURA_CLOUD_SERVICE_FACTORY_PID, FACTORY_PID);
+            cloudServiceProperties.put("device.display-name", "device-name");
+            cloudServiceProperties.put("device.custom-name", "custom-name");
 
             this.configurationService.createFactoryConfiguration(CLOUD_SERVICE_FACTORY_PID, pid, cloudServiceProperties,
                     false);
