@@ -1,6 +1,6 @@
 <MetaData xmlns="http://www.osgi.org/xmlns/metatype/v1.2.0" localization="en_us">
     <OCD id="de.db.i4i.esf.aws.iot.AwsIotCloudService" 
-         name="CloudService" 
+         name="AwsIotCloudService" 
          description="The CloudService allows for setting a user friendly name for the current device. It also provides the option to compress message payloads to reduce network traffic.">
 
         <Icon resource="AwsIotCloudService" size="32"/>
@@ -29,7 +29,7 @@
         </AD>
     </OCD>
     
-    <Designate pid="de.db.i4i.esf.aws.iot.AwsIotCloudService" factoryPid="de.db.i4i.esf.aws.iot.AwsIotCloudService">
+    <Designate pid="de.db.i4i.esf.aws.iot.AwsIotCloudService">
         <Object ocdref="de.db.i4i.esf.aws.iot.AwsIotCloudService"/>
     </Designate>
 </MetaData>
