@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <scr:component xmlns:scr="http://www.osgi.org/xmlns/scr/v1.1.0" activate="activate" configuration-policy="require" deactivate="deactivate" enabled="true" immediate="false" modified="updated" name="de.db.i4i.esf.aws.iot.AwsIotCloudService">
    <implementation class="de.db.i4i.esf.aws.iot.AwsIotCloudServiceImpl"/>
-   <reference bind="setDataService" cardinality="1..1" interface="org.eclipse.kura.data.DataService" name="DataService" policy="static" unbind="unsetDataService"/>
+   <reference bind="setDataService" cardinality="1..1" interface="org.eclipse.kura.data.DataService" name="DataService" policy="static" target="(kura.service.pid=org.eclipse.kura.data.DataService-AwsIot)" unbind="unsetDataService"/>
    <service>
       <provide interface="de.db.i4i.esf.aws.iot.CloudPayloadJsonDecoder"/>
       <provide interface="de.db.i4i.esf.aws.iot.CloudPayloadJsonEncoder"/>
