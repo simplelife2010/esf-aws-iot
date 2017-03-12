@@ -134,6 +134,10 @@ public class AwsIotCloudServiceImpl implements CloudService, DataServiceListener
         return this.options;
     }
 	
+	public void removeCloudClient(AwsIotCloudClientImpl cloudClient) {
+        this.cloudClients.remove(cloudClient);
+    }
+	
 	byte[] encodePayload(KuraPayload payload) throws KuraException {
         byte[] bytes = new byte[0];
         if (payload == null) {
