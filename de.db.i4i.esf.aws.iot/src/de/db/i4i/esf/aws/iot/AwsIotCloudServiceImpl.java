@@ -6,6 +6,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.eclipse.kura.KuraErrorCode;
 import org.eclipse.kura.KuraException;
@@ -36,8 +37,11 @@ public class AwsIotCloudServiceImpl implements CloudService, DataServiceListener
 	
 	private final List<AwsIotCloudClientImpl> cloudClients;
 	
+	private final AtomicInteger messageId;
+	
 	public AwsIotCloudServiceImpl() {
         this.cloudClients = new CopyOnWriteArrayList<AwsIotCloudClientImpl>();
+        this.messageId = new AtomicInteger();
     }
 
 	public void setDataService(DataService dataService) {
@@ -81,14 +85,28 @@ public class AwsIotCloudServiceImpl implements CloudService, DataServiceListener
 	
 	@Override
 	public KuraPayload buildFromByteArray(byte[] payload) throws KuraException {
-		// TODO Auto-generated method stub
-		return null;
+		CloudPayloadJsonDecoderImpl encoder = new CloudPayloadJsonDecoderImpl(payload);
+        KuraPayload kuraPayload;
+
+        try {
+            kuraPayload = encoder.buildFromByteArray();
+            return kuraPayload;
+        } catch (KuraInvalidMessageException e) {
+            throw new KuraException(KuraErrorCode.DECODER_ERROR, e);
+        }
 	}
 
 	@Override
 	public byte[] getBytes(KuraPayload kuraPayload) throws KuraException {
-		// TODO Auto-generated method stub
-		return null;
+		CloudPayloadEncoder encoder = new CloudPayloadJsonEncoderImpl(kuraPayload);
+
+        byte[] bytes;
+        try {
+            bytes = encoder.getBytes();
+            return bytes;
+        } catch (IOException e) {
+            throw new KuraException(KuraErrorCode.ENCODE_ERROR, e);
+        }
 	}
 
 	@Override
@@ -122,21 +140,18 @@ public class AwsIotCloudServiceImpl implements CloudService, DataServiceListener
 	public void onMessageArrived(String topic, byte[] payload, int qos, boolean retained) {
 		logger.info("Message arrived on topic: {}", topic);
 
-		String appTopic = new String("");
-		String[] topicParts = topic.split(this.options.getTopicSeparator());
+		AwsIotKuraTopic kuraTopic = new AwsIotKuraTopic(topic);
+		String accountName = kuraTopic.getAccountName();
+		String appTopic = kuraTopic.getApplicationTopic();
 		
-		if(topicParts.length == 0) {
+		if(accountName == null || accountName.isEmpty()) {
 			logger.warn("Empty topic, ignoring message");
 			return;
 		}
 		
-		if (!topicParts[0].equals(this.options.getTopicAccountToken())) {
+		if (!accountName.equals(this.options.getTopicAccountToken())) {
 			logger.warn("Unexpected topic {}, ignoring message", topic);
 			return;
-		}
-		
-		if (topicParts.length > 1) {
-			appTopic = topic.substring(1 + topic.indexOf(this.options.getTopicSeparator()));
 		}
 		
 		KuraPayload kuraPayload;
@@ -158,14 +173,46 @@ public class AwsIotCloudServiceImpl implements CloudService, DataServiceListener
 
 	@Override
 	public void onMessagePublished(int messageId, String topic) {
-		// TODO Auto-generated method stub
+		synchronized (this.messageId) {
+            if (this.messageId.get() != -1 && this.messageId.get() == messageId) {
+                if (this.options.getLifeCycleMessageQos() == 0) {
+                    this.messageId.set(-1);
+                }
+                this.messageId.notifyAll();
+                return;
+            }
+        }
 
+		AwsIotKuraTopic kuraTopic = new AwsIotKuraTopic(topic);
+		if (kuraTopic.getAccountName().equals(this.options.getTopicAccountToken())) {
+	        // notify listeners
+	        for (AwsIotCloudClientImpl cloudClient : this.cloudClients) {
+                            cloudClient.onMessagePublished(messageId, kuraTopic.getApplicationTopic());
+	        }
+        } else {
+        	logger.warn("Unexpected topic {}, not notifying any listeners", topic);
+        }
 	}
 
 	@Override
 	public void onMessageConfirmed(int messageId, String topic) {
-		// TODO Auto-generated method stub
+		synchronized (this.messageId) {
+            if (this.messageId.get() != -1 && this.messageId.get() == messageId) {
+                this.messageId.set(-1);
+                this.messageId.notifyAll();
+                return;
+            }
+        }
 
+		AwsIotKuraTopic kuraTopic = new AwsIotKuraTopic(topic);
+		if (kuraTopic.getAccountName().equals(this.options.getTopicAccountToken())) {
+	        // notify listeners
+	        for (AwsIotCloudClientImpl cloudClient : this.cloudClients) {
+                            cloudClient.onMessageConfirmed(messageId, kuraTopic.getApplicationTopic());
+	        }
+        } else {
+        	logger.warn("Unexpected topic {}, not notifying any listeners", topic);
+        }
 	}
 
 	@Override
