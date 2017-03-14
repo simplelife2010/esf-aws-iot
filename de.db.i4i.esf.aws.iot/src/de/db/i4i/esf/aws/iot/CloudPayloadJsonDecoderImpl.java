@@ -18,7 +18,7 @@ public class CloudPayloadJsonDecoderImpl {
 		KuraPayload kuraPayload;
 		try {
 			KuraPayload2Json kuraPayload2Json = mapper.readValue(bytes, KuraPayload2Json.class);
-			kuraPayload = kuraPayload2Json.getKuraPayload();
+			kuraPayload = kuraPayload2Json.convertToKuraPayload();
 		} catch (Exception e) {
 			throw new KuraInvalidMessageException(e);
 		}

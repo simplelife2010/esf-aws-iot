@@ -26,7 +26,7 @@ public class KuraPayload2Json {
 		this.body = payload.getBody();
 	}
 	
-	public KuraPayload getKuraPayload() {
+	public KuraPayload convertToKuraPayload() {
 		KuraPayload kuraPayload = new KuraPayload();
 		kuraPayload.setTimestamp(sentOn);
 		kuraPayload.setPosition(position);
